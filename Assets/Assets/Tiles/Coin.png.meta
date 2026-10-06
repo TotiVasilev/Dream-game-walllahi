@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: dbea7540bb08dcf4996a7573b6966b86
+guid: f501a0c82a3bd0c4fbf107acd45a054c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -2701098624761965992
-    second: Tntwhite_0
+      213: -3338749442709606003
+    second: Coin_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -51,7 +51,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 16
+  spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -128,7 +128,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Tntwhite_0
+      name: Coin_0
       rect:
         serializedVersion: 2
         x: 0
@@ -143,8 +143,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 85254cf9c15c38ad0800000000000000
-      internalID: -2701098624761965992
+      spriteID: d81b24142116aa1d0800000000000000
+      internalID: -3338749442709606003
       vertices: []
       indices: 
       edges: []
@@ -163,7 +163,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Tntwhite_0: -2701098624761965992
+      Coin_0: -3338749442709606003
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

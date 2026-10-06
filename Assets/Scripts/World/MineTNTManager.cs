@@ -9,6 +9,7 @@ public class MineTNTManager : MonoBehaviour
     [SerializeField] private MineGrid mineGrid;
     [SerializeField] private Tilemap dirtTilemap;
     [SerializeField] private PlayerGridMovement player;
+    [SerializeField] private CoinCollectEffect coinCollectEffect;
 
     [SerializeField] private TileBase dirtNormal;
     [SerializeField] private TileBase dirtBroken;
@@ -16,18 +17,24 @@ public class MineTNTManager : MonoBehaviour
     [Header("TNT Tiles")]
     [SerializeField] private TileBase tntTile;
 
-    [Tooltip("A bright/white tile shown briefly while the TNT flashes.")]
+    [Tooltip(
+        "A bright/white tile shown briefly while the TNT flashes."
+    )]
     [SerializeField] private TileBase tntFlashTile;
 
     [Header("TNT Fuse")]
     [Min(0f)]
     [SerializeField] private float fuseDuration = 1.5f;
 
-    [Tooltip("Flash speed when TNT is first revealed.")]
+    [Tooltip(
+        "Flash speed when TNT is first revealed."
+    )]
     [Min(0.01f)]
     [SerializeField] private float startingFlashInterval = 0.18f;
 
-    [Tooltip("Flash speed immediately before the explosion.")]
+    [Tooltip(
+        "Flash speed immediately before the explosion."
+    )]
     [Min(0.01f)]
     [SerializeField] private float endingFlashInterval = 0.05f;
 
@@ -169,7 +176,8 @@ public class MineTNTManager : MonoBehaviour
         float elapsed = 0f;
         bool showingFlash = false;
 
-        while (elapsed < fuseDuration)
+        while (elapsed <
+               fuseDuration)
         {
             float progress =
                 fuseDuration > 0f
@@ -206,7 +214,8 @@ public class MineTNTManager : MonoBehaviour
             }
 
             float remainingTime =
-                fuseDuration - elapsed;
+                fuseDuration -
+                elapsed;
 
             float waitTime =
                 Mathf.Min(
@@ -221,13 +230,10 @@ public class MineTNTManager : MonoBehaviour
                 waitTime
             );
 
-            elapsed += waitTime;
+            elapsed +=
+                waitTime;
         }
 
-        /*
-         * Put TNT back for the final instant
-         * before the explosion.
-         */
         if (tntTile != null)
         {
             dirtTilemap.SetTile(
@@ -278,32 +284,40 @@ public class MineTNTManager : MonoBehaviour
 
         BreakLine(
             center,
-            new Vector2Int(1, 1),
+            new Vector2Int(
+                1,
+                1
+            ),
             diagonalExplosionDistance
         );
 
         BreakLine(
             center,
-            new Vector2Int(-1, 1),
+            new Vector2Int(
+                -1,
+                1
+            ),
             diagonalExplosionDistance
         );
 
         BreakLine(
             center,
-            new Vector2Int(1, -1),
+            new Vector2Int(
+                1,
+                -1
+            ),
             diagonalExplosionDistance
         );
 
         BreakLine(
             center,
-            new Vector2Int(-1, -1),
+            new Vector2Int(
+                -1,
+                -1
+            ),
             diagonalExplosionDistance
         );
 
-        /*
-         * The explosion may remove the floor
-         * underneath the player.
-         */
         if (player != null)
         {
             player.CheckGravityAfterWorldChange();
@@ -348,6 +362,10 @@ public class MineTNTManager : MonoBehaviour
                 cell
             );
 
+        /*
+         * Already empty/broken cells don't
+         * generate another coin.
+         */
         if (currentTile == null ||
             currentTile == dirtBroken)
         {
@@ -371,6 +389,17 @@ public class MineTNTManager : MonoBehaviour
             cell,
             Color.white
         );
+
+        /*
+         * Spawn the visual collectible from the
+         * exact cell destroyed by the explosion.
+         */
+        if (coinCollectEffect != null)
+        {
+            coinCollectEffect.SpawnCoin(
+                position
+            );
+        }
 
         if (dirtBroken != null)
         {

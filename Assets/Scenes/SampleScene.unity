@@ -893,6 +893,7 @@ MonoBehaviour:
   dirtTilemap: {fileID: 2048083896}
   mineCamera: {fileID: 519420031}
   tntManager: {fileID: 1684236586}
+  coinCollectEffect: {fileID: 1097474689}
   dirtNormal: {fileID: 11400000, guid: 2ef0f04164c6d734f94fbad29d584d43, type: 2}
   dirtCrack1: {fileID: 11400000, guid: b1290045eb31ee543bd554660e692a9b, type: 2}
   dirtCrack2: {fileID: 11400000, guid: 9b86008a00bd6bf4a9d87f9805ff2f0e, type: 2}
@@ -907,12 +908,67 @@ MonoBehaviour:
   shakeSpeed: 50
   drillsNeededToCharge: 1
   powerDrillLength: 4
-  powerTileDelay: 0.04
-  powerPlungeStepDuration: 0.07
-  powerHorizontalMoveDuration: 0.08
+  powerDashDuration: 0.22
+  powerBreakPoint: 0.45
   powerShakeAmount: 0.07
-  powerShakeDuration: 0
   powerShakeSpeed: 50
+--- !u!1 &1097474688
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1097474690}
+  - component: {fileID: 1097474689}
+  m_Layer: 0
+  m_Name: CoinCollectEffect
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1097474689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1097474688}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a3b2d6ddd4025a4e8965fe926707ed0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CoinCollectEffect
+  mineGrid: {fileID: 1625760540}
+  player: {fileID: 780541567}
+  mineCamera: {fileID: 519420031}
+  coinPrefab: {fileID: 324642424287935717, guid: 7118c59741dc65a488bfc85574fae596, type: 3}
+  popDistance: 2.7
+  popDuration: 0.18
+  startingScale: 0.22
+  fullScale: 1
+  collectDelay: 0.05
+  collectDuration: 0.22
+  collectedScale: 0.15
+  directionRandomness: 0.851
+  screenPadding: 0.25
+--- !u!4 &1097474690
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1097474688}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.01099, y: 0.38217, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1106431611
 GameObject:
   m_ObjectHideFlags: 0
@@ -1865,6 +1921,7 @@ MonoBehaviour:
   mineGrid: {fileID: 1625760540}
   dirtTilemap: {fileID: 2048083896}
   player: {fileID: 780541568}
+  coinCollectEffect: {fileID: 1097474689}
   dirtNormal: {fileID: 11400000, guid: 2ef0f04164c6d734f94fbad29d584d43, type: 2}
   dirtBroken: {fileID: 11400000, guid: ec2e203e33c4e534da1139f04b3d20ea, type: 2}
   tntTile: {fileID: 11400000, guid: 823f66ca6c3a3134aaeffff8b2c11be6, type: 2}
@@ -2368,3 +2425,4 @@ SceneRoots:
   - {fileID: 1106431615}
   - {fileID: 1705774461}
   - {fileID: 1684236587}
+  - {fileID: 1097474690}
