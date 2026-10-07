@@ -392,6 +392,75 @@ MonoBehaviour:
   chargingColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   readyColor: {r: 1, g: 1, b: 1, a: 1}
   armedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+--- !u!1 &322424851
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 322424853}
+  - component: {fileID: 322424852}
+  m_Layer: 0
+  m_Name: Centipede
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &322424852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 322424851}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b43b3d3909284224eb31d0589924b95a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CentipedeEnemy
+  mineGrid: {fileID: 1625760540}
+  backgroundTilemap: {fileID: 678856856}
+  headSprite: {fileID: 82474713590753924, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  straightBodySprite: {fileID: 1240229768, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  tailSprite: {fileID: 203699577, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  rightToDown: {fileID: -2084813314, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  rightToUp: {fileID: -1398624005, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  leftToDown: {fileID: -43899565, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  leftToUp: {fileID: -647809959, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  downToRight: {fileID: -56064718, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  downToLeft: {fileID: 376126825, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  upToRight: {fileID: -1851600561, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  upToLeft: {fileID: -627154256, guid: 0db556ba2fd1c404ebf53fad2b65755e, type: 3}
+  tailDefaultDirection: 3
+  segmentCount: 5
+  startingHeadPosition: {x: 5, y: 8}
+  startingDirection: 1
+  spawnCheckInterval: 0.1
+  moveDuration: 0.1
+  movePause: 0.1
+  forwardWeight: 0.6
+  leftTurnWeight: 0.2
+  rightTurnWeight: 0.2
+  sortingLayerName: Default
+  orderInLayer: 15
+--- !u!4 &322424853
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 322424851}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 12.27685, y: -34.04111, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -2426,3 +2495,4 @@ SceneRoots:
   - {fileID: 1705774461}
   - {fileID: 1684236587}
   - {fileID: 1097474690}
+  - {fileID: 322424853}
