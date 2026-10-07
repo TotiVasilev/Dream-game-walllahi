@@ -439,8 +439,8 @@ MonoBehaviour:
   startingHeadPosition: {x: 5, y: 8}
   startingDirection: 1
   spawnCheckInterval: 0.1
-  moveDuration: 0.1
-  movePause: 0.1
+  tilesPerSecond: 2.5
+  bodySpriteSwitchPoint: 0.5
   forwardWeight: 0.6
   leftTurnWeight: 0.2
   rightTurnWeight: 0.2
