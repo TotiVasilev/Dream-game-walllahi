@@ -23,28 +23,13 @@ public class CentipedeEnemy : MonoBehaviour
     [SerializeField] private Sprite tailSprite;
 
     [Header("Corner Sprites - Movement Direction")]
-    [Tooltip("Moving RIGHT before the corner, then DOWN.")]
     [SerializeField] private Sprite rightToDown;
-
-    [Tooltip("Moving RIGHT before the corner, then UP.")]
     [SerializeField] private Sprite rightToUp;
-
-    [Tooltip("Moving LEFT before the corner, then DOWN.")]
     [SerializeField] private Sprite leftToDown;
-
-    [Tooltip("Moving LEFT before the corner, then UP.")]
     [SerializeField] private Sprite leftToUp;
-
-    [Tooltip("Moving DOWN before the corner, then RIGHT.")]
     [SerializeField] private Sprite downToRight;
-
-    [Tooltip("Moving DOWN before the corner, then LEFT.")]
     [SerializeField] private Sprite downToLeft;
-
-    [Tooltip("Moving UP before the corner, then RIGHT.")]
     [SerializeField] private Sprite upToRight;
-
-    [Tooltip("Moving UP before the corner, then LEFT.")]
     [SerializeField] private Sprite upToLeft;
 
     [Header("Tail")]
@@ -67,11 +52,18 @@ public class CentipedeEnemy : MonoBehaviour
     [SerializeField] private float spawnCheckInterval = 0.1f;
 
     [Header("Movement")]
-    [Min(0.01f)]
-    [SerializeField] private float moveDuration = 0.18f;
+    [Tooltip("How many grid tiles the centipede travels per second.")]
+    [Min(0.1f)]
+    [SerializeField] private float tilesPerSecond = 3f;
 
-    [Min(0f)]
-    [SerializeField] private float movePause = 0.05f;
+    [Header("Sprite Change Timing")]
+    [Tooltip(
+        "How far through a tile movement a body segment travels " +
+        "before changing to the sprite for its destination cell. " +
+        "0.5 means exactly halfway."
+    )]
+    [Range(0f, 1f)]
+    [SerializeField] private float bodySpriteSwitchPoint = 0.5f;
 
     [Header("Procedural Movement")]
     [Min(0f)]
@@ -92,8 +84,29 @@ public class CentipedeEnemy : MonoBehaviour
     private readonly List<Segment> segments =
         new List<Segment>();
 
+    /*
+     * currentPath represents the body at the
+     * current completed grid step.
+     *
+     * Index 0 = head.
+     * Last index = tail.
+     */
+    private readonly List<Vector2Int> currentPath =
+        new List<Vector2Int>();
+
+    /*
+     * nextPath represents where every segment
+     * will be after the current movement finishes.
+     */
+    private readonly List<Vector2Int> nextPath =
+        new List<Vector2Int>();
+
     private Direction currentDirection;
+
     private bool initialized;
+    private bool moving;
+
+    private float movementProgress;
 
     public enum Direction
     {
@@ -109,10 +122,10 @@ public class CentipedeEnemy : MonoBehaviour
         public Transform transform;
         public SpriteRenderer renderer;
 
-        public Vector2Int gridPosition;
-
-        public Vector3 previousWorldPosition;
+        public Vector3 startWorldPosition;
         public Vector3 targetWorldPosition;
+
+        public bool destinationSpriteApplied;
     }
 
     private struct DirectionChoice
@@ -155,7 +168,7 @@ public class CentipedeEnemy : MonoBehaviour
             tailSprite == null)
         {
             Debug.LogError(
-                "CentipedeEnemy is missing its head, straight body, or tail sprite.",
+                "CentipedeEnemy is missing its main sprites.",
                 this
             );
 
@@ -165,8 +178,7 @@ public class CentipedeEnemy : MonoBehaviour
         if (!DoesStartingBodyFitInsideGrid())
         {
             Debug.LogError(
-                "The centipede starting body is outside the mine. " +
-                "Change Starting Head Position, Starting Direction, or Segment Count.",
+                "The centipede starting body is outside the mine.",
                 this
             );
 
@@ -249,12 +261,15 @@ public class CentipedeEnemy : MonoBehaviour
     {
         ClearSegments();
 
+        currentPath.Clear();
+        nextPath.Clear();
+
         currentDirection =
             startingDirection;
 
         Vector2Int direction =
             DirectionToGridVector(
-                currentDirection
+                startingDirection
             );
 
         for (int i = 0;
@@ -265,13 +280,22 @@ public class CentipedeEnemy : MonoBehaviour
                 startingHeadPosition -
                 direction * i;
 
+            currentPath.Add(
+                position
+            );
+
             CreateSegment(
                 position,
                 i
             );
         }
 
-        UpdateAllSegmentSprites();
+        movementProgress = 0f;
+        moving = false;
+
+        UpdateAllSpritesFromPath(
+            currentPath
+        );
 
         initialized = true;
     }
@@ -319,14 +343,14 @@ public class CentipedeEnemy : MonoBehaviour
                 renderer =
                     spriteRenderer,
 
-                gridPosition =
-                    position,
-
-                previousWorldPosition =
+                startWorldPosition =
                     worldPosition,
 
                 targetWorldPosition =
-                    worldPosition
+                    worldPosition,
+
+                destinationSpriteApplied =
+                    true
             };
 
         segments.Add(
@@ -338,34 +362,263 @@ public class CentipedeEnemy : MonoBehaviour
     {
         while (initialized)
         {
-            Direction? nextDirection =
-                ChooseNextDirection();
-
-            if (!nextDirection.HasValue)
+            if (!moving)
             {
-                yield return new WaitForSeconds(
-                    0.1f
-                );
-
-                continue;
+                if (!PrepareNextStep())
+                {
+                    yield return null;
+                    continue;
+                }
             }
 
-            currentDirection =
-                nextDirection.Value;
+            float duration =
+                1f /
+                Mathf.Max(
+                    0.1f,
+                    tilesPerSecond
+                );
 
-            yield return StartCoroutine(
-                MoveOneCell(
-                    currentDirection
-                )
+            movementProgress +=
+                Time.deltaTime /
+                duration;
+
+            float t =
+                Mathf.Clamp01(
+                    movementProgress
+                );
+
+            /*
+             * HEAD:
+             *
+             * Its new facing direction was already
+             * applied before movement started.
+             *
+             * BODY:
+             *
+             * Each segment switches to the sprite
+             * belonging to its destination cell
+             * when it reaches the configured point
+             * through the movement.
+             */
+            for (int i = 0;
+                 i < segments.Count;
+                 i++)
+            {
+                Segment segment =
+                    segments[i];
+
+                segment.transform.position =
+                    Vector3.Lerp(
+                        segment.startWorldPosition,
+                        segment.targetWorldPosition,
+                        t
+                    );
+
+                if (i > 0 &&
+                    !segment.destinationSpriteApplied &&
+                    t >= bodySpriteSwitchPoint)
+                {
+                    ApplyDestinationSprite(
+                        i
+                    );
+
+                    segment.destinationSpriteApplied =
+                        true;
+                }
+            }
+
+            if (movementProgress >= 1f)
+            {
+                FinishCurrentStep();
+            }
+
+            yield return null;
+        }
+    }
+
+    private bool PrepareNextStep()
+    {
+        Direction? nextDirection =
+            ChooseNextDirection();
+
+        if (!nextDirection.HasValue)
+        {
+            return false;
+        }
+
+        currentDirection =
+            nextDirection.Value;
+
+        Vector2Int newHeadPosition =
+            currentPath[0] +
+            DirectionToGridVector(
+                currentDirection
             );
 
-            if (movePause > 0f)
-            {
-                yield return new WaitForSeconds(
-                    movePause
+        nextPath.Clear();
+
+        /*
+         * New head cell.
+         */
+        nextPath.Add(
+            newHeadPosition
+        );
+
+        /*
+         * Every other segment moves into the
+         * previous segment's current cell.
+         */
+        for (int i = 1;
+             i < segmentCount;
+             i++)
+        {
+            nextPath.Add(
+                currentPath[i - 1]
+            );
+        }
+
+        for (int i = 0;
+             i < segments.Count;
+             i++)
+        {
+            Segment segment =
+                segments[i];
+
+            segment.startWorldPosition =
+                segment.transform.position;
+
+            segment.targetWorldPosition =
+                mineGrid.GridToWorld(
+                    nextPath[i]
                 );
+
+            segment.destinationSpriteApplied =
+                false;
+        }
+
+        /*
+         * HEAD MUST FACE ITS NEW MOVEMENT
+         * DIRECTION BEFORE IT STARTS MOVING.
+         */
+        ApplyHeadMovementSprite();
+
+        segments[0].destinationSpriteApplied =
+            true;
+
+        movementProgress = 0f;
+        moving = true;
+
+        return true;
+    }
+
+    private void ApplyHeadMovementSprite()
+    {
+        Segment head =
+            segments[0];
+
+        Vector2Int facingDirection =
+            DirectionToGridVector(
+                currentDirection
+            );
+
+        head.renderer.sprite =
+            headSprite;
+
+        head.transform.rotation =
+            Quaternion.Euler(
+                0f,
+                0f,
+                GetRotationFromDirection(
+                    Vector2Int.left,
+                    facingDirection
+                )
+            );
+    }
+
+    private void ApplyDestinationSprite(
+        int index)
+    {
+        if (index <= 0 ||
+            index >= segments.Count)
+        {
+            return;
+        }
+
+        /*
+         * TAIL
+         */
+        if (index ==
+            segments.Count - 1)
+        {
+            ApplyTailSpriteFromPath(
+                nextPath
+            );
+
+            return;
+        }
+
+        /*
+         * BODY
+         */
+        ApplyBodySpriteFromPath(
+            index,
+            nextPath
+        );
+    }
+
+    private void FinishCurrentStep()
+    {
+        /*
+         * Make absolutely sure every segment
+         * finishes exactly at its destination.
+         */
+        for (int i = 0;
+             i < segments.Count;
+             i++)
+        {
+            Segment segment =
+                segments[i];
+
+            segment.transform.position =
+                segment.targetWorldPosition;
+
+            if (i > 0 &&
+                !segment.destinationSpriteApplied)
+            {
+                ApplyDestinationSprite(
+                    i
+                );
+
+                segment.destinationSpriteApplied =
+                    true;
             }
         }
+
+        /*
+         * nextPath now becomes the real current
+         * body configuration.
+         */
+        currentPath.Clear();
+
+        for (int i = 0;
+             i < nextPath.Count;
+             i++)
+        {
+            currentPath.Add(
+                nextPath[i]
+            );
+        }
+
+        /*
+         * Reapply everything from the completed
+         * path to guarantee exact final state.
+         */
+        UpdateAllSpritesFromPath(
+            currentPath
+        );
+
+        movementProgress = 0f;
+        moving = false;
     }
 
     private Direction? ChooseNextDirection()
@@ -412,7 +665,8 @@ public class CentipedeEnemy : MonoBehaviour
                 );
 
             Vector2Int reversePosition =
-                GetNextHeadPosition(
+                currentPath[0] +
+                DirectionToGridVector(
                     reverse
                 );
 
@@ -482,13 +736,14 @@ public class CentipedeEnemy : MonoBehaviour
         Direction direction,
         float weight)
     {
-        Vector2Int targetPosition =
-            GetNextHeadPosition(
+        Vector2Int target =
+            currentPath[0] +
+            DirectionToGridVector(
                 direction
             );
 
         if (!CanMoveHeadTo(
-                targetPosition))
+                target))
         {
             return;
         }
@@ -511,15 +766,6 @@ public class CentipedeEnemy : MonoBehaviour
         );
     }
 
-    private Vector2Int GetNextHeadPosition(
-        Direction direction)
-    {
-        return segments[0].gridPosition +
-               DirectionToGridVector(
-                   direction
-               );
-    }
-
     private bool CanMoveHeadTo(
         Vector2Int position)
     {
@@ -530,10 +776,10 @@ public class CentipedeEnemy : MonoBehaviour
         }
 
         for (int i = 0;
-             i < segments.Count;
+             i < currentPath.Count;
              i++)
         {
-            if (segments[i].gridPosition ==
+            if (currentPath[i] ==
                 position)
             {
                 return false;
@@ -562,133 +808,51 @@ public class CentipedeEnemy : MonoBehaviour
         );
     }
 
-    private IEnumerator MoveOneCell(
-        Direction direction)
+    private void UpdateAllSpritesFromPath(
+        List<Vector2Int> bodyPath)
     {
-        Vector2Int newHeadPosition =
-            segments[0].gridPosition +
-            DirectionToGridVector(
-                direction
-            );
-
-        List<Vector2Int> oldPositions =
-            new List<Vector2Int>();
-
-        for (int i = 0;
-             i < segments.Count;
-             i++)
+        if (bodyPath.Count <
+            segments.Count)
         {
-            oldPositions.Add(
-                segments[i].gridPosition
-            );
-
-            segments[i].previousWorldPosition =
-                segments[i].transform.position;
-        }
-
-        segments[0].gridPosition =
-            newHeadPosition;
-
-        for (int i = 1;
-             i < segments.Count;
-             i++)
-        {
-            segments[i].gridPosition =
-                oldPositions[i - 1];
-        }
-
-        for (int i = 0;
-             i < segments.Count;
-             i++)
-        {
-            segments[i].targetWorldPosition =
-                mineGrid.GridToWorld(
-                    segments[i].gridPosition
-                );
-        }
-
-        UpdateAllSegmentSprites();
-
-        float elapsed = 0f;
-
-        float duration =
-            Mathf.Max(
-                0.01f,
-                moveDuration
-            );
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-
-            float t =
-                Mathf.Clamp01(
-                    elapsed / duration
-                );
-
-            float smoothT =
-                Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    t
-                );
-
-            for (int i = 0;
-                 i < segments.Count;
-                 i++)
-            {
-                segments[i].transform.position =
-                    Vector3.Lerp(
-                        segments[i].previousWorldPosition,
-                        segments[i].targetWorldPosition,
-                        smoothT
-                    );
-            }
-
-            yield return null;
-        }
-
-        for (int i = 0;
-             i < segments.Count;
-             i++)
-        {
-            segments[i].transform.position =
-                segments[i].targetWorldPosition;
-        }
-    }
-
-    private void UpdateAllSegmentSprites()
-    {
-        if (segments.Count < 2)
             return;
+        }
 
-        UpdateHeadSprite();
+        ApplyHeadSpriteFromPath(
+            bodyPath
+        );
 
         for (int i = 1;
              i < segments.Count - 1;
              i++)
         {
-            UpdateBodySprite(
-                i
+            ApplyBodySpriteFromPath(
+                i,
+                bodyPath
             );
         }
 
-        UpdateTailSprite();
+        ApplyTailSpriteFromPath(
+            bodyPath
+        );
     }
 
-    private void UpdateHeadSprite()
+    private void ApplyHeadSpriteFromPath(
+        List<Vector2Int> bodyPath)
     {
         Segment head =
             segments[0];
 
-        Segment body =
-            segments[1];
+        Vector2Int headPosition =
+            bodyPath[0];
+
+        Vector2Int bodyPosition =
+            bodyPath[1];
 
         Vector2Int directionToBody =
-            body.gridPosition -
-            head.gridPosition;
+            bodyPosition -
+            headPosition;
 
-        Vector2Int headFacing =
+        Vector2Int facingDirection =
             -directionToBody;
 
         head.renderer.sprite =
@@ -700,120 +864,62 @@ public class CentipedeEnemy : MonoBehaviour
                 0f,
                 GetRotationFromDirection(
                     Vector2Int.left,
-                    headFacing
+                    facingDirection
                 )
             );
     }
 
-    private void UpdateTailSprite()
+    private void ApplyBodySpriteFromPath(
+        int index,
+        List<Vector2Int> bodyPath)
     {
-        int tailIndex =
-            segments.Count - 1;
-
-        Segment tail =
-            segments[tailIndex];
-
-        Segment body =
-            segments[tailIndex - 1];
-
-        Vector2Int directionToBody =
-            body.gridPosition -
-            tail.gridPosition;
-
-        tail.renderer.sprite =
-            tailSprite;
-
-        tail.transform.rotation =
-            Quaternion.Euler(
-                0f,
-                0f,
-                GetRotationFromDirection(
-                    DirectionToGridVector(
-                        tailDefaultDirection
-                    ),
-                    directionToBody
-                )
-            );
-    }
-
-    private void UpdateBodySprite(
-        int index)
-    {
-        Segment current =
+        Segment segment =
             segments[index];
 
-        Segment headNeighbor =
-            segments[index - 1];
+        Vector2Int currentPosition =
+            bodyPath[index];
 
-        Segment tailNeighbor =
-            segments[index + 1];
+        Vector2Int headNeighbor =
+            bodyPath[index - 1];
 
-        /*
-         * The centipede body list is:
-         *
-         * HEAD -> ... -> TAIL
-         *
-         * But to determine the actual movement
-         * through this body piece, we trace:
-         *
-         * TAIL -> CURRENT -> HEAD
-         */
-
-        Vector2Int tailSide =
-            tailNeighbor.gridPosition -
-            current.gridPosition;
+        Vector2Int tailNeighbor =
+            bodyPath[index + 1];
 
         Vector2Int headSide =
-            headNeighbor.gridPosition -
-            current.gridPosition;
+            headNeighbor -
+            currentPosition;
+
+        Vector2Int tailSide =
+            tailNeighbor -
+            currentPosition;
 
         bool straight =
             headSide == -tailSide;
 
         if (straight)
         {
-            UpdateStraightBodySprite(
-                current,
+            ApplyStraightBodySprite(
+                segment,
                 headSide
             );
 
             return;
         }
 
-        /*
-         * IMPORTANT:
-         *
-         * tailSide tells us where the tail is,
-         * but we want the direction the
-         * centipede is MOVING as it enters
-         * the current cell.
-         *
-         * Example:
-         *
-         * Tail is RIGHT of the corner.
-         *
-         * The centipede therefore moves LEFT
-         * INTO the corner.
-         *
-         * So incomingMovement = -tailSide.
-         *
-         * headSide already tells us the
-         * direction we leave the corner.
-         */
         Vector2Int incomingMovement =
             -tailSide;
 
         Vector2Int outgoingMovement =
             headSide;
 
-        UpdateCornerBodySprite(
-            current,
+        ApplyCornerBodySprite(
+            segment,
             incomingMovement,
             outgoingMovement
         );
     }
 
-    private void UpdateStraightBodySprite(
+    private void ApplyStraightBodySprite(
         Segment segment,
         Vector2Int headSide)
     {
@@ -821,12 +927,9 @@ public class CentipedeEnemy : MonoBehaviour
             straightBodySprite;
 
         /*
-         * CONFIRMED FROM YOUR ART:
-         *
          * DARK = HEAD.
          *
-         * On the original straight sprite,
-         * DARK / HEAD is LEFT.
+         * Original dark/head side points LEFT.
          */
         segment.transform.rotation =
             Quaternion.Euler(
@@ -839,7 +942,7 @@ public class CentipedeEnemy : MonoBehaviour
             );
     }
 
-    private void UpdateCornerBodySprite(
+    private void ApplyCornerBodySprite(
         Segment segment,
         Vector2Int incomingMovement,
         Vector2Int outgoingMovement)
@@ -853,7 +956,7 @@ public class CentipedeEnemy : MonoBehaviour
         if (selectedSprite == null)
         {
             Debug.LogWarning(
-                "No corner sprite for movement " +
+                "Missing corner sprite for " +
                 GridVectorToDirection(
                     incomingMovement
                 ) +
@@ -877,13 +980,46 @@ public class CentipedeEnemy : MonoBehaviour
             selectedSprite;
 
         /*
-         * All 8 directional corners are
-         * already drawn correctly.
-         *
-         * NEVER rotate corner artwork.
+         * Your directional corner sprites are
+         * already drawn in final orientation.
          */
         segment.transform.rotation =
             Quaternion.identity;
+    }
+
+    private void ApplyTailSpriteFromPath(
+        List<Vector2Int> bodyPath)
+    {
+        int tailIndex =
+            segments.Count - 1;
+
+        Segment tail =
+            segments[tailIndex];
+
+        Vector2Int tailPosition =
+            bodyPath[tailIndex];
+
+        Vector2Int bodyPosition =
+            bodyPath[tailIndex - 1];
+
+        Vector2Int directionToBody =
+            bodyPosition -
+            tailPosition;
+
+        tail.renderer.sprite =
+            tailSprite;
+
+        tail.transform.rotation =
+            Quaternion.Euler(
+                0f,
+                0f,
+                GetRotationFromDirection(
+                    DirectionToGridVector(
+                        tailDefaultDirection
+                    ),
+                    directionToBody
+                )
+            );
     }
 
     private Sprite GetCornerSpriteByMovement(
@@ -955,19 +1091,19 @@ public class CentipedeEnemy : MonoBehaviour
         Vector2Int originalDirection,
         Vector2Int targetDirection)
     {
-        Vector2 originalWorldDirection =
+        Vector2 originalWorld =
             GridVectorToWorldVector(
                 originalDirection
             );
 
-        Vector2 targetWorldDirection =
+        Vector2 targetWorld =
             GridVectorToWorldVector(
                 targetDirection
             );
 
         return Vector2.SignedAngle(
-            originalWorldDirection,
-            targetWorldDirection
+            originalWorld,
+            targetWorld
         );
     }
 
@@ -1017,19 +1153,13 @@ public class CentipedeEnemy : MonoBehaviour
         Vector2Int direction)
     {
         if (direction == Vector2Int.right)
-        {
             return Direction.Right;
-        }
 
         if (direction == Vector2Int.left)
-        {
             return Direction.Left;
-        }
 
         if (direction.y > 0)
-        {
             return Direction.Down;
-        }
 
         return Direction.Up;
     }
@@ -1100,6 +1230,7 @@ public class CentipedeEnemy : MonoBehaviour
     private void ClearSegments()
     {
         initialized = false;
+        moving = false;
 
         for (int i = segments.Count - 1;
              i >= 0;
@@ -1114,5 +1245,8 @@ public class CentipedeEnemy : MonoBehaviour
         }
 
         segments.Clear();
+
+        currentPath.Clear();
+        nextPath.Clear();
     }
 }
