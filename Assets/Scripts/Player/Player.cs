@@ -7,108 +7,76 @@ public class PlayerGridMovement : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private MineGrid grid;
+    [SerializeField] private LevelHolder levelHolder;
     [SerializeField] private Tilemap dirtTilemap;
+    [Tooltip("Separate Tilemap for transparent cracks, aligned with Dirt and sorted above it.")]
+    [SerializeField] private Tilemap crackOverlayTilemap;
     [SerializeField] private Camera mineCamera;
     [SerializeField] private MineTNTManager tntManager;
     [SerializeField] private CoinCollectEffect coinCollectEffect;
-
-    [Header("Dirt Tiles")]
-    [SerializeField] private TileBase dirtNormal;
-    [SerializeField] private TileBase dirtCrack1;
-    [SerializeField] private TileBase dirtCrack2;
-    [SerializeField] private TileBase dirtBroken;
-
     [Header("Swipe")]
     [Min(1f)]
     [SerializeField] private float minimumSwipeDistance = 50f;
-
     [Header("Movement")]
     [Min(0f)]
     [SerializeField] private float moveDuration = 0.1f;
-
-    [Header("Gravity")]
-    [Min(0f)]
-    [SerializeField] private float fallMoveDuration = 0.08f;
-
-    [Header("Drilling")]
-    [Min(0f)]
-    [SerializeField] private float drillDuration = 1f;
-
-    [Range(0f, 1f)]
-    [SerializeField] private float crack1Time = 0.3f;
-
-    [Range(0f, 1f)]
-    [SerializeField] private float crack2Time = 0.6f;
-
+    // Fall duration, drill duration, and any number of crack stages
+    // are now configured per level in LevelHolder.
     [Header("Drilling Shake")]
     [Min(0f)]
     [SerializeField] private float shakeAmount = 0.04f;
-
     [Min(0f)]
     [SerializeField] private float shakeSpeed = 30f;
-
     [Header("Power Drill")]
     [Min(1)]
     [SerializeField] private int drillsNeededToCharge = 6;
-
     [Min(1)]
     [SerializeField] private int powerDrillLength = 3;
-
     [Tooltip("Total time for the complete power-drill dash.")]
     [Min(0.01f)]
     [SerializeField] private float powerDashDuration = 0.22f;
-
     [Tooltip(
         "How far through each tile the player gets before that tile breaks."
     )]
     [Range(0.05f, 0.95f)]
     [SerializeField] private float powerBreakPoint = 0.45f;
-
     [Header("Power Drill Impact")]
     [Min(0f)]
     [SerializeField] private float powerShakeAmount = 0.045f;
-
     [Min(0f)]
     [SerializeField] private float powerShakeSpeed = 80f;
-
     private Vector2Int gridPosition;
     private Vector2 swipeStartPosition;
-
     private bool trackingSwipe;
     private bool isBusy;
     private bool inputEnabled;
-
     private int normalDrillsCompleted;
     private bool powerDrillArmed;
-
     private bool gravityCheckRequested;
-
     public Vector2Int GridPosition =>
         gridPosition;
-
     public int NormalDrillsCompleted =>
         normalDrillsCompleted;
-
     public int DrillsNeededToCharge =>
         drillsNeededToCharge;
-
     public bool IsPowerDrillReady =>
         normalDrillsCompleted >=
         drillsNeededToCharge;
-
     public bool IsPowerDrillArmed =>
         powerDrillArmed;
-
     private void Start()
     {
+        if (levelHolder == null)
+            Debug.LogError("PlayerGridMovement: Assign LevelHolder in the Inspector.", this);
+        if (crackOverlayTilemap == null || crackOverlayTilemap == dirtTilemap)
+            Debug.LogWarning("PlayerGridMovement: Assign a separate Crack Overlay Tilemap, above Dirt, to display damage cracks.", this);
+
         gridPosition =
             new Vector2Int(
                 grid.StartingColumn,
                 0
             );
-
         inputEnabled = false;
-
         ResetPowerDrill();
     }
 
@@ -119,20 +87,15 @@ public class PlayerGridMovement : MonoBehaviour
             inputEnabled)
         {
             gravityCheckRequested = false;
-
             StartCoroutine(
                 HandleExternalGravity()
             );
-
             return;
         }
-
         if (!inputEnabled)
             return;
-
         if (isBusy)
             return;
-
         ReadTouchInput();
         ReadMouseInput();
     }
@@ -141,7 +104,6 @@ public class PlayerGridMovement : MonoBehaviour
         bool enabled)
     {
         inputEnabled = enabled;
-
         if (!enabled)
         {
             trackingSwipe = false;
@@ -151,22 +113,18 @@ public class PlayerGridMovement : MonoBehaviour
     public void StartMiningRun()
     {
         StopAllCoroutines();
-
         isBusy = false;
         trackingSwipe = false;
         gravityCheckRequested = false;
-
         gridPosition =
             new Vector2Int(
                 grid.StartingColumn,
                 0
             );
-
         transform.position =
             grid.GridToWorld(
                 gridPosition
             );
-
         ResetPowerDrill();
     }
 
@@ -174,16 +132,12 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (!inputEnabled)
             return;
-
         if (isBusy)
             return;
-
         if (!IsPowerDrillReady)
             return;
-
         if (powerDrillArmed)
             return;
-
         powerDrillArmed = true;
     }
 
@@ -195,11 +149,9 @@ public class PlayerGridMovement : MonoBehaviour
     private IEnumerator HandleExternalGravity()
     {
         isBusy = true;
-
         yield return StartCoroutine(
             ApplyGravity()
         );
-
         isBusy = false;
     }
 
@@ -213,29 +165,23 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (Touchscreen.current == null)
             return;
-
         var touch =
             Touchscreen.current.primaryTouch;
-
         if (touch.press.wasPressedThisFrame)
         {
             swipeStartPosition =
                 touch.position.ReadValue();
-
             trackingSwipe = true;
         }
-
         if (touch.press.wasReleasedThisFrame &&
             trackingSwipe)
         {
             Vector2 swipeEndPosition =
                 touch.position.ReadValue();
-
             ProcessSwipe(
                 swipeEndPosition -
                 swipeStartPosition
             );
-
             trackingSwipe = false;
         }
     }
@@ -244,26 +190,21 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (Mouse.current == null)
             return;
-
         if (Mouse.current.leftButton.wasPressedThisFrame)
         {
             swipeStartPosition =
                 Mouse.current.position.ReadValue();
-
             trackingSwipe = true;
         }
-
         if (Mouse.current.leftButton.wasReleasedThisFrame &&
             trackingSwipe)
         {
             Vector2 swipeEndPosition =
                 Mouse.current.position.ReadValue();
-
             ProcessSwipe(
                 swipeEndPosition -
                 swipeStartPosition
             );
-
             trackingSwipe = false;
         }
     }
@@ -276,9 +217,7 @@ public class PlayerGridMovement : MonoBehaviour
         {
             return;
         }
-
         Vector2Int direction;
-
         if (Mathf.Abs(swipe.x) >
             Mathf.Abs(swipe.y))
         {
@@ -294,7 +233,6 @@ public class PlayerGridMovement : MonoBehaviour
                 ? Vector2Int.up
                 : Vector2Int.down;
         }
-
         TryAction(
             direction
         );
@@ -308,17 +246,14 @@ public class PlayerGridMovement : MonoBehaviour
             TryPowerDrill(
                 direction
             );
-
             return;
         }
-
         if (direction ==
             Vector2Int.up)
         {
             TryMineAbove();
             return;
         }
-
         TryNormalMove(
             direction
         );
@@ -332,19 +267,16 @@ public class PlayerGridMovement : MonoBehaviour
                 gridPosition,
                 direction
             );
-
         if (!grid.IsValidPosition(
                 targetPosition))
         {
             return;
         }
-
         if (!IsInsideCameraTopBoundary(
                 targetPosition))
         {
             return;
         }
-
         StartCoroutine(
             HandleNormalMove(
                 targetPosition
@@ -359,35 +291,29 @@ public class PlayerGridMovement : MonoBehaviour
                 gridPosition,
                 Vector2Int.up
             );
-
         if (!grid.IsValidPosition(
                 targetPosition))
         {
             return;
         }
-
         if (!IsInsideCameraTopBoundary(
                 targetPosition))
         {
             return;
         }
-
         Vector3Int tileCell =
             grid.GridToTilemapCell(
                 targetPosition
             );
-
         TileBase targetTile =
             dirtTilemap.GetTile(
                 tileCell
             );
-
         if (!IsSolidDirt(
                 targetTile))
         {
             return;
         }
-
         StartCoroutine(
             MineAbove(
                 targetPosition,
@@ -404,13 +330,11 @@ public class PlayerGridMovement : MonoBehaviour
                 gridPosition,
                 direction
             );
-
         if (!grid.IsValidPosition(
                 firstPosition))
         {
             return;
         }
-
         if (direction ==
                 Vector2Int.up &&
             !IsInsideCameraTopBoundary(
@@ -418,7 +342,6 @@ public class PlayerGridMovement : MonoBehaviour
         {
             return;
         }
-
         StartCoroutine(
             HandlePowerDrill(
                 direction
@@ -430,17 +353,14 @@ public class PlayerGridMovement : MonoBehaviour
         Vector2Int targetPosition)
     {
         isBusy = true;
-
         Vector3Int tileCell =
             grid.GridToTilemapCell(
                 targetPosition
             );
-
         TileBase targetTile =
             dirtTilemap.GetTile(
                 tileCell
             );
-
         if (IsSolidDirt(
                 targetTile))
         {
@@ -448,42 +368,34 @@ public class PlayerGridMovement : MonoBehaviour
                 HasHiddenTNT(
                     targetPosition
                 );
-
             yield return StartCoroutine(
                 DrillTileAnimation(
                     tileCell
                 )
             );
-
             if (containsTNT)
             {
                 RevealTNT(
                     targetPosition,
                     tileCell
                 );
-
                 isBusy = false;
                 yield break;
             }
-
             BreakTileImmediately(
                 tileCell
             );
-
             AddNormalDrillCharge();
         }
-
         yield return StartCoroutine(
             MovePlayer(
                 targetPosition,
                 moveDuration
             )
         );
-
         yield return StartCoroutine(
             ApplyGravity()
         );
-
         isBusy = false;
     }
 
@@ -492,18 +404,15 @@ public class PlayerGridMovement : MonoBehaviour
         Vector3Int tileCell)
     {
         isBusy = true;
-
         bool containsTNT =
             HasHiddenTNT(
                 targetPosition
             );
-
         yield return StartCoroutine(
             DrillTileAnimation(
                 tileCell
             )
         );
-
         if (containsTNT)
         {
             RevealTNT(
@@ -516,14 +425,11 @@ public class PlayerGridMovement : MonoBehaviour
             BreakTileImmediately(
                 tileCell
             );
-
             AddNormalDrillCharge();
         }
-
         yield return StartCoroutine(
             ApplyGravity()
         );
-
         isBusy = false;
     }
 
@@ -532,7 +438,6 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (tntManager == null)
             return false;
-
         return tntManager.HasHiddenTNT(
             position
         );
@@ -542,10 +447,7 @@ public class PlayerGridMovement : MonoBehaviour
         Vector2Int position,
         Vector3Int tileCell)
     {
-        ResetTileTransform(
-            tileCell
-        );
-
+        ClearCrackOverlay(tileCell);
         if (tntManager != null)
         {
             tntManager.RevealTNT(
@@ -558,19 +460,15 @@ public class PlayerGridMovement : MonoBehaviour
         Vector2Int direction)
     {
         isBusy = true;
-
         ResetPowerDrill();
-
         yield return StartCoroutine(
             PowerDash(
                 direction
             )
         );
-
         yield return StartCoroutine(
             ApplyGravity()
         );
-
         isBusy = false;
     }
 
@@ -579,9 +477,7 @@ public class PlayerGridMovement : MonoBehaviour
     {
         Vector2Int startGridPosition =
             gridPosition;
-
         int validDistance = 0;
-
         for (int distance = 1;
              distance <= powerDrillLength;
              distance++)
@@ -592,13 +488,11 @@ public class PlayerGridMovement : MonoBehaviour
                     direction,
                     distance
                 );
-
             if (!grid.IsValidPosition(
                     testPosition))
             {
                 break;
             }
-
             if (direction ==
                     Vector2Int.up &&
                 !IsInsideCameraTopBoundary(
@@ -606,58 +500,46 @@ public class PlayerGridMovement : MonoBehaviour
             {
                 break;
             }
-
             validDistance =
                 distance;
         }
-
         if (validDistance <= 0)
         {
             yield break;
         }
-
         Vector2Int finalGridPosition =
             GetGridPositionInDirection(
                 startGridPosition,
                 direction,
                 validDistance
             );
-
         Vector3 startWorldPosition =
             grid.GridToWorld(
                 startGridPosition
             );
-
         Vector3 finalWorldPosition =
             grid.GridToWorld(
                 finalGridPosition
             );
-
         bool playerShouldMove =
             direction !=
             Vector2Int.up;
-
         int nextTileToBreak = 1;
-
         float duration =
             Mathf.Max(
                 0.01f,
                 powerDashDuration
             );
-
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             elapsed +=
                 Time.deltaTime;
-
             float progress =
                 Mathf.Clamp01(
                     elapsed /
                     duration
                 );
-
             if (playerShouldMove)
             {
                 transform.position =
@@ -667,68 +549,52 @@ public class PlayerGridMovement : MonoBehaviour
                         progress
                     );
             }
-
             float travelledTiles =
                 progress *
                 validDistance;
-
             while (nextTileToBreak <=
                    validDistance)
             {
                 float breakDistance =
                     (nextTileToBreak - 1) +
                     powerBreakPoint;
-
                 if (travelledTiles <
                     breakDistance)
                 {
                     break;
                 }
-
                 Vector2Int tilePosition =
                     GetGridPositionInDirection(
                         startGridPosition,
                         direction,
                         nextTileToBreak
                     );
-
                 Vector3Int tileCell =
                     grid.GridToTilemapCell(
                         tilePosition
                     );
-
                 TileBase targetTile =
                     dirtTilemap.GetTile(
                         tileCell
                     );
-
                 if (IsSolidDirt(
                         targetTile))
                 {
-                    if (dirtCrack2 != null)
-                    {
-                        dirtTilemap.SetTile(
-                            tileCell,
-                            dirtCrack2
-                        );
-                    }
-
+                    // Power drilling breaks immediately. Leave the underlying
+                    // dirt untouched until BreakTileImmediately(), which also
+                    // clears any transparent crack overlay.
                     ApplyPowerTileShake(
                         tileCell,
                         elapsed
                     );
-
                     BreakTileImmediately(
                         tileCell
                     );
                 }
-
                 nextTileToBreak++;
             }
-
             yield return null;
         }
-
         while (nextTileToBreak <=
                validDistance)
         {
@@ -738,17 +604,14 @@ public class PlayerGridMovement : MonoBehaviour
                     direction,
                     nextTileToBreak
                 );
-
             Vector3Int tileCell =
                 grid.GridToTilemapCell(
                     tilePosition
                 );
-
             TileBase targetTile =
                 dirtTilemap.GetTile(
                     tileCell
                 );
-
             if (IsSolidDirt(
                     targetTile))
             {
@@ -756,15 +619,12 @@ public class PlayerGridMovement : MonoBehaviour
                     tileCell
                 );
             }
-
             nextTileToBreak++;
         }
-
         if (playerShouldMove)
         {
             transform.position =
                 finalWorldPosition;
-
             gridPosition =
                 finalGridPosition;
         }
@@ -774,9 +634,7 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (IsPowerDrillReady)
             return;
-
         normalDrillsCompleted++;
-
         normalDrillsCompleted =
             Mathf.Min(
                 normalDrillsCompleted,
@@ -787,8 +645,10 @@ public class PlayerGridMovement : MonoBehaviour
     private bool IsSolidDirt(
         TileBase tile)
     {
+        // Preserve the original behaviour: anything on the dirt Tilemap
+        // is solid unless it is one of this level library's broken tiles.
         return tile != null &&
-               tile != dirtBroken;
+               (levelHolder == null || !levelHolder.IsBrokenTile(tile));
     }
 
     private Vector2Int GetGridPositionInDirection(
@@ -800,7 +660,6 @@ public class PlayerGridMovement : MonoBehaviour
             startPosition.x +
             direction.x *
             distance,
-
             startPosition.y -
             direction.y *
             distance
@@ -812,20 +671,16 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (mineCamera == null)
             return true;
-
         Vector3 targetWorldPosition =
             grid.GridToWorld(
                 targetPosition
             );
-
         float cameraTop =
             mineCamera.transform.position.y +
             mineCamera.orthographicSize;
-
         float targetTileTop =
             targetWorldPosition.y +
             grid.TileSize * 0.5f;
-
         return targetTileTop <=
                cameraTop;
     }
@@ -839,144 +694,135 @@ public class PlayerGridMovement : MonoBehaviour
                     gridPosition.x,
                     gridPosition.y + 1
                 );
-
             if (!grid.IsValidPosition(
                     positionBelow))
             {
                 yield break;
             }
-
             Vector3Int cellBelow =
                 grid.GridToTilemapCell(
                     positionBelow
                 );
-
             TileBase tileBelow =
                 dirtTilemap.GetTile(
                     cellBelow
                 );
-
             bool isOpenBelow =
                 tileBelow == null ||
-                tileBelow == dirtBroken;
-
+                (levelHolder != null && levelHolder.IsBrokenTile(tileBelow));
             if (!isOpenBelow)
             {
                 yield break;
             }
-
             yield return StartCoroutine(
                 MovePlayer(
                     positionBelow,
-                    fallMoveDuration
+                    levelHolder != null ? levelHolder.ActiveFallMoveDuration : 0.08f
                 )
             );
         }
     }
 
-    private IEnumerator DrillTileAnimation(
-        Vector3Int tileCell)
+    private IEnumerator DrillTileAnimation(Vector3Int tileCell)
     {
-        if (drillDuration <= 0f)
-        {
+        float duration = levelHolder != null ? levelHolder.ActiveDrillDuration : 1f;
+        ClearCrackOverlay(tileCell);
+
+        if (duration <= 0f)
             yield break;
-        }
 
-        if (dirtNormal != null)
-        {
-            dirtTilemap.SetTile(
-                tileCell,
-                dirtNormal
-            );
-        }
-
+        // The original randomly chosen/rotated/flipped dirt sprite remains
+        // on the Dirt Tilemap throughout drilling.
+        Matrix4x4 originalTileTransform = dirtTilemap.GetTransformMatrix(tileCell);
         float elapsed = 0f;
+        int visibleStage = -1;
+        int stageCount = levelHolder != null ? levelHolder.ActiveCrackStageCount : 0;
 
-        bool showedCrack1 = false;
-        bool showedCrack2 = false;
-
-        while (elapsed <
-               drillDuration)
+        while (elapsed < duration)
         {
-            elapsed +=
-                Time.deltaTime;
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
 
-            float progress =
-                Mathf.Clamp01(
-                    elapsed /
-                    drillDuration
-                );
-
-            if (!showedCrack1 &&
-                progress >= crack1Time)
+            // Pick the LATEST applicable stage by threshold (not by array order).
+            // This also behaves correctly if more than one stage is crossed in
+            // the same frame, or designers enter stages out of order.
+            int nextStage = -1;
+            float latestTime = -1f;
+            for (int i = 0; i < stageCount; i++)
             {
-                showedCrack1 = true;
-
-                if (dirtCrack1 != null)
+                float time = levelHolder.GetCrackStageNormalizedTime(i);
+                if (progress >= time && (time > latestTime || (time == latestTime && i > nextStage)))
                 {
-                    dirtTilemap.SetTile(
-                        tileCell,
-                        dirtCrack1
-                    );
+                    nextStage = i;
+                    latestTime = time;
                 }
             }
 
-            if (!showedCrack2 &&
-                progress >= crack2Time)
+            if (nextStage != visibleStage)
             {
-                showedCrack2 = true;
+                visibleStage = nextStage;
+                TileBase crack = nextStage >= 0
+                    ? levelHolder.GetRandomCrackStageTile(nextStage)
+                    : null;
 
-                if (dirtCrack2 != null)
-                {
-                    dirtTilemap.SetTile(
-                        tileCell,
-                        dirtCrack2
-                    );
-                }
+                SetCrackOverlay(tileCell, crack, originalTileTransform);
             }
 
-            ApplyTileShake(
-                tileCell,
-                elapsed
-            );
-
+            ApplyTileShake(tileCell, elapsed, originalTileTransform);
             yield return null;
         }
 
-        ResetTileTransform(
-            tileCell
-        );
+        // Preserve the dirt's original random rotation/flip if the drilling
+        // revealed TNT rather than destroying the block.
+        dirtTilemap.SetTransformMatrix(tileCell, originalTileTransform);
+        if (IsCrackOverlayAvailable() && crackOverlayTilemap.HasTile(tileCell))
+            crackOverlayTilemap.SetTransformMatrix(tileCell, originalTileTransform);
     }
 
-    private void BreakTileImmediately(
-        Vector3Int tileCell)
+    private bool IsCrackOverlayAvailable()
     {
-        ResetTileTransform(
-            tileCell
-        );
+        return crackOverlayTilemap != null && crackOverlayTilemap != dirtTilemap;
+    }
 
-        if (dirtBroken != null)
+    private void SetCrackOverlay(Vector3Int tileCell, TileBase crackTile, Matrix4x4 dirtTransform)
+    {
+        if (!IsCrackOverlayAvailable())
+            return;
+
+        crackOverlayTilemap.SetTile(tileCell, crackTile);
+        if (crackTile != null)
         {
-            dirtTilemap.SetTile(
-                tileCell,
-                dirtBroken
-            );
+            crackOverlayTilemap.SetTileFlags(tileCell, TileFlags.None);
+            // Match the precise transform of the dirt sprite underneath.
+            crackOverlayTilemap.SetTransformMatrix(tileCell, dirtTransform);
         }
+    }
 
-        ResetTileTransform(
-            tileCell
-        );
+    private void ClearCrackOverlay(Vector3Int tileCell)
+    {
+        if (IsCrackOverlayAvailable())
+            crackOverlayTilemap.SetTile(tileCell, null);
+    }
+
+    private void BreakTileImmediately(Vector3Int tileCell)
+    {
+        ClearCrackOverlay(tileCell);
+
+        TileBase brokenTile = levelHolder != null
+            ? levelHolder.GetRandomBrokenTile()
+            : null;
+
+        // The original dirt is replaced only AFTER drilling finishes.
+        // Broken tiles are passable (runtime collider: None).
+        dirtTilemap.SetTile(tileCell, brokenTile);
+        if (brokenTile != null)
+            dirtTilemap.SetTileFlags(tileCell, TileFlags.None);
+        ResetTileTransform(tileCell);
 
         if (coinCollectEffect != null)
         {
-            Vector2Int brokenPosition =
-                TilemapCellToGridPosition(
-                    tileCell
-                );
-
-            coinCollectEffect.SpawnCoin(
-                brokenPosition
-            );
+            Vector2Int brokenPosition = TilemapCellToGridPosition(tileCell);
+            coinCollectEffect.SpawnCoin(brokenPosition);
         }
     }
 
@@ -991,27 +837,25 @@ public class PlayerGridMovement : MonoBehaviour
 
     private void ApplyTileShake(
         Vector3Int tileCell,
-        float elapsed)
+        float elapsed,
+        Matrix4x4 originalTileTransform)
     {
         if (shakeAmount <= 0f ||
             shakeSpeed <= 0f)
         {
             return;
         }
-
         float xOffset =
             Mathf.Sin(
                 elapsed *
                 shakeSpeed
             ) * shakeAmount;
-
         float yOffset =
             Mathf.Sin(
                 elapsed *
                 shakeSpeed *
                 1.37f
             ) * shakeAmount;
-
         Matrix4x4 shakeMatrix =
             Matrix4x4.TRS(
                 new Vector3(
@@ -1022,11 +866,11 @@ public class PlayerGridMovement : MonoBehaviour
                 Quaternion.identity,
                 Vector3.one
             );
-
-        dirtTilemap.SetTransformMatrix(
-            tileCell,
-            shakeMatrix
-        );
+        Matrix4x4 animatedTransform = shakeMatrix * originalTileTransform;
+        dirtTilemap.SetTransformMatrix(tileCell, animatedTransform);
+        // Shake BOTH layers together so transparent cracks never slide off dirt.
+        if (IsCrackOverlayAvailable() && crackOverlayTilemap.HasTile(tileCell))
+            crackOverlayTilemap.SetTransformMatrix(tileCell, animatedTransform);
     }
 
     private void ApplyPowerTileShake(
@@ -1038,20 +882,17 @@ public class PlayerGridMovement : MonoBehaviour
         {
             return;
         }
-
         float xOffset =
             Mathf.Sin(
                 elapsed *
                 powerShakeSpeed
             ) * powerShakeAmount;
-
         float yOffset =
             Mathf.Sin(
                 elapsed *
                 powerShakeSpeed *
                 1.41f
             ) * powerShakeAmount;
-
         Matrix4x4 shakeMatrix =
             Matrix4x4.TRS(
                 new Vector3(
@@ -1062,7 +903,6 @@ public class PlayerGridMovement : MonoBehaviour
                 Quaternion.identity,
                 Vector3.one
             );
-
         dirtTilemap.SetTransformMatrix(
             tileCell,
             shakeMatrix
@@ -1074,7 +914,6 @@ public class PlayerGridMovement : MonoBehaviour
     {
         if (dirtTilemap == null)
             return;
-
         dirtTilemap.SetTransformMatrix(
             tileCell,
             Matrix4x4.identity
@@ -1087,49 +926,38 @@ public class PlayerGridMovement : MonoBehaviour
     {
         Vector3 startPosition =
             transform.position;
-
         Vector3 targetWorldPosition =
             grid.GridToWorld(
                 targetPosition
             );
-
         if (duration <= 0f)
         {
             transform.position =
                 targetWorldPosition;
-
             gridPosition =
                 targetPosition;
-
             yield break;
         }
-
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             elapsed +=
                 Time.deltaTime;
-
             float t =
                 Mathf.Clamp01(
                     elapsed /
                     duration
                 );
-
             transform.position =
                 Vector3.Lerp(
                     startPosition,
                     targetWorldPosition,
                     t
                 );
-
             yield return null;
         }
-
         transform.position =
             targetWorldPosition;
-
         gridPosition =
             targetPosition;
     }
